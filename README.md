@@ -62,3 +62,54 @@ A transaction state shows the current stage or condition of a transaction as it 
    The transaction ends after committing or rolling back. The system is ready for a new transaction.  
 
 This process ensures the database remains consistent, either completing the transaction fully or undoing changes in case of failure.
+
+
+
+### What is a Transitive Functional Dependency?
+
+A **transitive functional dependency** happens when a non-key column in a database table indirectly depends on the primary key **through another non-key column**.
+
+### Breaking It Down:
+
+1. A **functional dependency** means one column's value determines another column's value.  
+   Example: In a `Students` table, `StudentID → Name` means the `StudentID` determines the `Name`.
+
+2. **Transitive dependency** means this happens indirectly.  
+   - Column A (Primary Key) determines Column B.  
+   - Column B determines Column C.  
+   - Therefore, Column A indirectly determines Column C.  
+
+This indirect dependency is a **transitive functional dependency**.
+
+---
+
+### Example:
+
+Consider a `Students` table:
+
+| StudentID | DepartmentID | DepartmentName |
+|-----------|--------------|----------------|
+| 101       | D01          | Computer Science |
+| 102       | D02          | Mathematics      |
+
+- **Primary Key**: `StudentID`  
+- **Functional Dependency**:  
+  - `StudentID → DepartmentID` (StudentID determines DepartmentID).  
+  - `DepartmentID → DepartmentName` (DepartmentID determines DepartmentName).  
+  - So, `StudentID → DepartmentName` is a transitive dependency because `StudentID` indirectly determines `DepartmentName` through `DepartmentID`.
+
+---
+
+### Why Is This a Problem?
+- Transitive dependencies can lead to **data redundancy** and **anomalies**.  
+- Example: If the department name changes, you must update it everywhere it appears in the table.
+
+---
+
+### Solution:
+- **Normalize the table** to eliminate transitive dependencies by creating separate tables for related data.  
+- For the example, split the table into two:  
+  1. **Students Table**: `StudentID`, `DepartmentID`  
+  2. **Departments Table**: `DepartmentID`, `DepartmentName`  
+
+This ensures data consistency and avoids redundancy.
