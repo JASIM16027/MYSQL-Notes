@@ -65,6 +65,87 @@ This process ensures the database remains consistent, either completing the tran
 
 
 
+### What is Second Normal Form (2NF)?
+
+Second Normal Form (2NF) is a step in database normalization that ensures the elimination of partial dependencies, which occur when non-key columns depend on only part of a composite primary key. 
+
+To achieve 2NF, two rules must be satisfied:
+1. **Be in 1NF**: The table must have a primary key, and all values must be atomic (no repeating groups or arrays).
+2. **No Partial Dependencies**: All non-key columns must depend on the **entire primary key**, not just a part of it.
+
+---
+
+### Example of Moving to 2NF
+
+#### 1NF Example: A Single Table
+
+| MembershipID | MemberName | MovieRented | RentalDate |
+|--------------|------------|-------------|------------|
+| 101          | John Doe   | Matrix      | 2025-01-15 |
+| 101          | John Doe   | Inception   | 2025-01-16 |
+| 102          | Jane Roe   | Avatar      | 2025-01-15 |
+
+- **Primary Key**: Composite key `(MembershipID, MovieRented)` uniquely identifies each row.
+- Issue: Non-key column `MemberName` depends only on `MembershipID`, not the entire composite key. This is a **partial dependency**.
+
+---
+
+#### Why Is This Not in 2NF?
+
+- `MemberName` depends **only on MembershipID** (part of the composite key).
+- `MovieRented` and `RentalDate` depend on the entire composite key `(MembershipID, MovieRented)`.
+
+This violates 2NF because not all non-key columns depend on the entire primary key.
+
+---
+
+#### Moving to 2NF: Splitting the Table
+
+To remove the partial dependency, divide the table into two:
+
+1. **Table 1: Members**
+   | MembershipID | MemberName |
+   |--------------|------------|
+   | 101          | John Doe   |
+   | 102          | Jane Roe   |
+
+   - **Primary Key**: `MembershipID`
+   - `MemberName` depends only on `MembershipID`.
+
+2. **Table 2: Rentals**
+   | MembershipID | MovieRented | RentalDate |
+   |--------------|-------------|------------|
+   | 101          | Matrix      | 2025-01-15 |
+   | 101          | Inception   | 2025-01-16 |
+   | 102          | Avatar      | 2025-01-15 |
+
+   - **Primary Key**: Composite key `(MembershipID, MovieRented)`
+   - `RentalDate` depends on the entire composite key.
+
+---
+
+### Foreign Key and Its Role
+
+- In **Table 2**, `MembershipID` is now a **foreign key** that links back to **Table 1**.
+- A **foreign key**:
+  1. References the **primary key** of another table (here, `MembershipID` in **Table 1**).
+  2. Helps establish relationships between tables (connects members to their rentals).
+  3. Allows rows in one table to correspond to rows in another.
+
+---
+
+### Key Points About Foreign Keys
+- A **foreign key** can have a name different from the primary key it references.
+- **Foreign keys do not need to be unique**, as multiple rows in the child table can reference the same row in the parent table.
+- Unlike primary keys, **foreign keys can contain NULL values**, meaning the reference can be optional.
+
+---
+
+### Benefits of 2NF and Foreign Keys
+- Eliminates **partial dependencies**, reducing data redundancy.
+- Organizes data into separate, related tables, improving database consistency.
+- **Foreign keys** ensure relationships between tables remain valid, supporting data integrity.
+
 ### What is a Transitive Functional Dependency?
 
 A **transitive functional dependency** happens when a non-key column in a database table indirectly depends on the primary key **through another non-key column**.
@@ -113,3 +194,5 @@ Consider a `Students` table:
   2. **Departments Table**: `DepartmentID`, `DepartmentName`  
 
 This ensures data consistency and avoids redundancy.
+
+
