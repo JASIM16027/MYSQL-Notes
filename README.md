@@ -1,3 +1,78 @@
+
+Here are some **important database interview questions** for mid-level and senior developers. I've grouped them by topic for clarity:
+
+---
+
+### **1. General Database Concepts**
+- What are the differences between **SQL** and **NoSQL** databases? When would you choose one over the other?
+- Explain database normalization and its importance. What are the **normal forms**?
+- What is **denormalization**? When would you use it?
+- What is an **index**, and how does it improve performance? What are the downsides of over-indexing?
+- Explain the differences between a **primary key**, **unique key**, and **foreign key**.
+- What is the **ACID** property in databases, and why is it important?
+- Explain the difference between **OLTP** and **OLAP** systems.
+
+---
+
+### **2. Query Optimization**
+- How would you optimize a slow SQL query?
+- Explain the use of **EXPLAIN** or **QUERY PLAN** tools in analyzing query performance.
+- What is a **query execution plan**, and how can you use it to improve performance?
+- How would you handle **n+1 query problems** in relational databases?
+- What are **partitioning** and **sharding**? How do they impact performance?
+
+---
+
+### **3. Transactions and Concurrency**
+- Explain the difference between **pessimistic locking** and **optimistic locking**.
+- What are database isolation levels? Can you explain the differences between **READ UNCOMMITTED**, **READ COMMITTED**, **REPEATABLE READ**, and **SERIALIZABLE**?
+- How would you handle **deadlocks** in a database?
+- What is a **two-phase commit**? When would you use it?
+
+---
+
+### **4. NoSQL Databases**
+- What are the main types of NoSQL databases (e.g., **document stores**, **key-value stores**, **graph databases**, **column-family stores**)? Provide examples.
+- Explain the **CAP theorem** and how it applies to distributed systems.
+- How would you design a schema in a document database like MongoDB?
+- What is the difference between a **replica set** and **sharded cluster** in MongoDB?
+
+---
+
+### **5. Database Design**
+- How would you design a schema for a social media application (e.g., users, posts, likes, and comments)?
+- What is an **ER diagram**, and how do you use it for database design?
+- How do you manage relationships in a database (one-to-one, one-to-many, many-to-many)?
+- How would you design a database to scale horizontally?
+
+---
+
+### **6. Performance and Scalability**
+- How do you handle large datasets in a database?
+- What are the differences between **vertical scaling** and **horizontal scaling** in databases?
+- What is **read/write splitting**, and how can it improve performance?
+- Explain **caching strategies** for databases (e.g., Redis, Memcached).
+- How would you design a database to handle millions of concurrent transactions?
+
+---
+
+### **7. Backup, Security, and Maintenance**
+- How do you ensure database backups are consistent and reliable?
+- What are **database migrations**, and how do you handle them in a live environment?
+- How do you implement **role-based access control** (RBAC) in a database?
+- What are some strategies to secure sensitive data in a database (e.g., encryption, masking)?
+- How do you handle schema changes in a production database?
+
+---
+
+### **8. Tools and Frameworks**
+- Have you used any ORMs (e.g., TypeORM, Sequelize, Hibernate)? What are the pros and cons of using an ORM?
+- What tools have you used for database monitoring and performance analysis?
+- How would you use a tool like **pgAdmin**, **Mongo Compass**, or **MySQL Workbench** for database management?
+
+---
+
+
 # MYSQL-Notes
 
 
