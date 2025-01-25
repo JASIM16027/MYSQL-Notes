@@ -780,4 +780,291 @@ Indexes are powerful tools for improving database performance, especially for re
 
 
 
+#### 2. **Implementing the Money Transfer Function**
+
+Next, we’ll implement a function that transfers money from one account to another. This function will use transactions to ensure that both accounts are updated correctly.
+
+```javascript
+async function transferMoney(senderId, receiverId, amount) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        // Find sender's account
+        const senderAccount = await Account.findOne({ userId: senderId }).session(session);
+        if (!senderAccount) throw new Error('Sender account not found');
+
+        // Find receiver's account
+        const receiverAccount = await Account.findOne({ userId: receiverId }).session(session);
+        if (!receiverAccount) throw new Error('Receiver account not found');
+
+        // Check if sender has sufficient balance
+        if (senderAccount.balance < amount) {
+            throw new Error('Insufficient balance');
+        }
+
+        // Update balances
+        senderAccount.balance -= amount; // Deduct from sender
+        receiverAccount.balance += amount; // Add to receiver
+
+        // Save both accounts within the transaction
+        await senderAccount.save({ session });
+        await receiverAccount.save({ session });
+
+        // Commit the transaction
+        await session.commitTransaction();
+        console.log('Transfer successful');
+    } catch (error) {
+        // Rollback the transaction on error
+        await session.abortTransaction();
+        console.error('Transaction aborted:', error.message);
+    } finally {
+        session.endSession();
+    }
+}
+```
+
+### Explanation of the Code
+
+1. **Start a Session**: We initiate a session with `mongoose.startSession()` and begin the transaction with `session.startTransaction()`.
+
+2. **Find Accounts**: 
+   - We retrieve the sender's and receiver's accounts using `Account.findOne()`, attaching the session to each operation to ensure they are part of the transaction.
+
+3. **Check Balance**: 
+   - We verify if the sender has sufficient balance to complete the transfer.
+
+4. **Update Balances**: 
+   - The sender's balance is decreased by the transfer amount, and the receiver's balance is increased by the same amount.
+
+5. **Save Changes**: 
+   - We save both accounts using `save({ session })`, ensuring that the changes are tracked as part of the transaction.
+
+6. **Commit or Rollback**: 
+   - If all operations succeed, we commit the transaction with `session.commitTransaction()`. If any operation fails, we roll back using `session.abortTransaction()` to maintain consistency.
+
+7. **End the Session**: 
+   - Finally, we end the session with `session.endSession()`.
+
+### Usage Example
+
+To use the `transferMoney` function, you would call it with the appropriate user IDs and transfer amount:
+
+```javascript
+transferMoney('senderUserId', 'receiverUserId', 100)
+    .then(() => console.log('Transaction completed'))
+    .catch(error => console.error('Transaction failed:', error));
+```
+
+### Conclusion
+
+This concise example demonstrates how to implement transactions in a Mongoose-based banking system, ensuring that operations are atomic and consistent. By encapsulating the logic in a function, you can easily call it from different parts of your application while maintaining robust error handling and data integrity.
+
+
+
+## Database Indexing
+
+
+```
+  +-------------------------------------------------+
+  |           Logical Representation (Table)        |
+  |-------------------------------------------------|
+  | Column1   | Column2   | Column3                 |
+  | Emp ID    | Name      | Address                 |
+  |-------------------------------------------------|
+  | Row1      | 1         | A         | City A      |
+  | Row2      | 2         | B         | City B      |
+  | Row3      | 3         | C         | City C      |
+  | Row4      | 4         | D         | City D      |
+  +-------------------------------------------------+
+  |            This is just a logical representation |
+  |        Actual data is not stored this way!       |
+  +-------------------------------------------------+
+
+                    ↓ 
+
+  +---------------------------------------------+
+  |           Physical Storage (Data Pages)     |
+  |---------------------------------------------|
+  |   DBMS creates Data Pages (e.g., 8KB size)  |
+  |---------------------------------------------|
+  |   Each Data Page stores multiple table rows |
+  +---------------------------------------------+
+```
+
+
+The image explains how table data is actually stored in a database, emphasizing that the typical tabular representation of rows and columns is just a **logical view** and not how data is physically stored.
+
+### Key points:
+1. **Logical Representation**: 
+   - The table with columns like `Emp ID`, `Name`, and `Address` is a conceptual way to view the data.
+   - The actual data is not stored tabular form in the database's physical storage.
+
+2. **Data Pages**: 
+   - Databases use **data pages** to store information. 
+   - A data page typically has a size of **8KB**, though this can vary depending on the database system.
+   
+3. **Multiple Rows in a Page**: 
+   - Each **data page** can store multiple rows of a table, meaning the physical storage is organized into these data pages, and the rows are spread across them.
+
+ ### **Data Pages**:
+ 
+![image](https://github.com/user-attachments/assets/df5d8c3e-304d-470c-ab3b-a8d835c34007)
+
+This image shows the structure of a **data page** in a database system, breaking down how the 8KB (8192 bytes) of storage in a data page is divided.
+
+Here’s a text-based diagram to represent the structure of the data page shown in the image:
+
+```
++-------------------------------+
+|         Data Page (8KB)        |
+|          (8192 bytes)          |
++-------------------------------+
+|                               |
+|  Header (96 bytes)            |
+|  - PageNo                     |
+|  - Free space                 |
+|  - Checksum, etc.             |
+|                               |
++-------------------------------+
+|                               |
+|  Data Records (8060 bytes)    |
+|  - Actual data is stored here |
+|                               |
++-------------------------------+
+|                               |
+|  Offset (36 bytes)            |
+|  - Array of pointers to       |
+|    corresponding data         |
+|                               |
++-------------------------------+
+```
+
+### Breakdown of a Data Page:
+1. **Header (96 bytes)**:
+   - Stores metadata about the page such as:
+     - **PageNo**: The page number that identifies this specific page.
+     - **Free space**: The amount of free space available in the page.
+     - **Checksum**: Used for data integrity checks.
+
+2. **Data Records (8060 bytes)**:
+   - This section is where the **actual data** is stored.
+   - Most of the page is used to hold rows from the table.
+
+3. **Offset (36 bytes)**:
+   - Contains an array of pointers.
+   - Each index in this array points to a corresponding data record in the "Data Records" section.
+   - This helps locate the specific data within the page.
+
+### Summary:
+The **8KB page** is divided into these three components:
+- **96 bytes** for the **header** to store metadata.
+- **8060 bytes** for **data records** to store actual row data.
+- **36 bytes** for the **offset array** that holds pointers to the data. 
+
+This structure helps the DBMS efficiently manage and retrieve data.
+
+
+##  **Data pages** and **Data blocks**
+
+The relationship between **data pages** and **data blocks** in a database system, focusing on how data is stored and managed in physical memory.
+
+"Remember, DBMS controls data pages (like what row goes in which page or sequence of pages, etc.) but  **DBMS has no control over Data Blocks** (data blocks can be scattered over the disk)."
+ **Data Pages** are logical units of data storage within the DBMS, while **Data Blocks** are the physical units of storage at the disk level.
+
+### Key points:
+1. **DBMS and Data Pages**:
+   - The **DBMS (Database Management System)** creates and manages multiple **data pages** to store the data of a table.
+   - A table's data can span across many data pages, depending on its size.
+
+2. **Data Pages Stored in Data Blocks**:
+   - These **data pages** are ultimately stored in **data blocks**, which reside in **physical memory** (such as a disk).
+   - A **data block** is the smallest unit of data storage that can be read or written during an input/output (I/O) operation.
+
+### What is a Data Block?
+- **Data Block**: The minimum amount of data that can be transferred to and from disk during I/O operations.
+- **Managed by Disk**: The data block is controlled by the underlying storage system (such as a hard drive or SSD).
+- **Size Range**: Data block sizes can vary, typically ranging from **4KB to 32KB**. A common size is **8KB**.
+- **Multiple Data Pages**: Depending on the block size, a data block can contain **one or more data pages**.
+
+### Summary:
+The DBMS manages data by creating **data pages**, which are logically organized but stored in **data blocks** in physical storage. The **data block** is the smallest unit of data that the storage system reads or writes, and depending on its size, it may hold multiple data pages.
+
+
+The image explains the concept of a **Data Block** in the context of database management systems (DBMS) and disk storage. Here's a detailed breakdown of the information:
+
+### What is a Data Block?
+- **Data Block** is the minimum amount of data that can be read from or written to disk in a single I/O (input/output) operation. In essence, it is the smallest unit of storage that can be addressed by a storage system like a disk.
+  
+### Key Points:
+1. **Managed by the Storage System (like a disk)**: The data block size is controlled by the storage system, which can be a disk, SSD, or any underlying hardware.
+   
+2. **Block Size Range**: 
+   - Data block sizes generally range between **4KB to 32KB**. 
+   - A common size for many systems is **8KB**. 
+   - This size is crucial because it affects the performance and storage efficiency. Larger block sizes may be more efficient for reading and writing large files, while smaller block sizes might suit systems with many small files.
+
+3. **Relationship Between Data Block and Data Page**: 
+   - A **Data Page** is a unit of data management inside the DBMS. Depending on the block size, a single block can hold **one or multiple data pages**.
+   - For example, if the block size is 8KB and the data page is 4KB, one block can store two pages. If the block size matches the page size (both 8KB), one block will hold exactly one page.
+
+### Mapping Between Data Page and Data Block:
+- The DBMS (Database Management System) maintains a **mapping** between data pages and data blocks. 
+   - In this mapping, each data page (logical data structure) is stored inside a data block (physical storage unit).
+   - The diagram suggests that multiple data pages can be mapped to a single data block. For instance:
+     - **Data Page 1 and Data Page 2** both map to **Data Block 1**. 
+     - This could imply that two data pages share the same physical data block (due to the block’s size).
+This illustrates the idea that depending on the size of data pages and blocks, one block can store one or many pages.
+
+```
+  ---------------------------------
+  |        Data Block 1           |
+  ---------------------------------
+  | Data Page 1 | Data Page 2     |  -> One block contains two pages.
+  ---------------------------------
+
+  ---------------------------------
+  |        Data Block 2           |
+  ---------------------------------
+  | Data Page 3                   |  -> This block contains one page (large enough to fill the block).
+  ---------------------------------
+
+  ---------------------------------
+  |        Data Block 3           |
+  ---------------------------------
+  | Data Page 4 | Data Page 5     |  -> Another block with two pages.
+  ---------------------------------
+
+  ---------------------------------
+  |        Data Block 4           |
+  ---------------------------------
+  | Data Page 6 | Data Page 7     |  -> Similar structure with two pages.
+  ---------------------------------
+
+  ---------------------------------
+  |        Data Block 5           |
+  ---------------------------------
+  | Data Page 8                   |  -> Block fully occupied by one large page.
+  ---------------------------------
+```
+
+### Explanation:
+- **Data Block 1** holds two smaller pages: `Data Page 1` and `Data Page 2`.
+- **Data Block 2** holds a single, larger page: `Data Page 3`.
+- **Data Blocks 3 and 4** both hold two pages each, showing how multiple pages can fit into one block when they are smaller than the block size.
+- **Data Block 5** is similar to Block 2, where one larger page (`Data Page 8`) occupies the entire block.
+
+
+
+### Why It Matters:
+- The relationship between data blocks and data pages is crucial in terms of performance and storage management.
+  - **I/O performance**: The size of a data block impacts how efficiently data is read from or written to disk. Larger blocks can reduce the number of I/O operations required to access large files, while smaller blocks can optimize small-file access.
+  - **Fragmentation and space management**: If data block sizes are too large, storage can be wasted, especially for systems dealing with small files. On the other hand, too-small blocks may increase overhead.
+
+In DBMS, this mapping also influences how data retrieval and modification operations are performed, as the DBMS needs to read data blocks and map them back to logical pages. The more optimized this process is, the better the overall performance.
+
+
+
+
+
 
