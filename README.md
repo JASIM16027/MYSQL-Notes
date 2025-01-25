@@ -191,6 +191,166 @@ db.products.find({
 
 ### **3. ACID vs BASE**
 
+To understand **ACID** (Atomicity, Consistency, Isolation, Durability), let's break it down with a **real-world calculation example**: a bank fund transfer system where we transfer money between two accounts.
+
+---
+
+### **Scenario**: Transferring $100 from Account A to Account B
+
+- **Initial Balances**:
+  - Account A: $500
+  - Account B: $300
+
+- **Goal**:
+  Transfer $100 from Account A to Account B.
+
+---
+
+### **1. Atomicity**
+
+Atomicity ensures that a transaction is **all or nothing**. Either both the debit and credit operations happen, or neither happens.
+
+#### Steps:
+- Debit $100 from Account A → $500 - $100 = $400
+- Credit $100 to Account B → $300 + $100 = $400
+
+#### What Happens If Atomicity Fails?
+- Debit occurs, but credit fails (e.g., system crash after debiting Account A):
+  - Account A: $400
+  - Account B: $300
+  - Total: $700 (Incorrect!)
+  
+  Atomicity ensures that **both operations succeed or none are applied**, maintaining the integrity of the transaction.
+
+---
+
+### **2. Consistency**
+
+Consistency ensures that the **database remains in a valid state** before and after the transaction, adhering to predefined rules.
+
+#### Rules:
+- Total money in the system must remain the same.
+- Before: $500 (A) + $300 (B) = $800
+- After: $400 (A) + $400 (B) = $800 (Valid!)
+
+#### What Happens If Consistency Fails?
+- If $100 is debited from Account A but not credited to Account B:
+  - Account A: $400
+  - Account B: $300
+  - Total: $700 (Violates consistency!)
+
+Consistency ensures the system remains **logically correct** after every transaction.
+
+---
+
+### **3. Isolation**
+
+Isolation ensures that **concurrent transactions do not interfere** with each other. Let's say:
+
+#### Two Transactions Run Simultaneously:
+1. **T1**: Transfer $100 from A to B
+2. **T2**: Transfer $200 from A to C
+
+- Without Isolation:
+  - T1 debits $100 from A (new balance $400).
+  - T2 reads the outdated balance of $500 and debits $200 → Result: $300 in Account A.
+  - Total debits: $300 instead of $100 + $200 = $300. This is **wrong**.
+
+- With Isolation:
+  - T1 completes first:
+    - Account A: $400
+  - Then T2 starts:
+    - Account A: $400 - $200 = $200
+  - Correct result.
+
+Isolation ensures transactions are processed **serially or in a way that doesn’t conflict**.
+
+---
+
+### **4. Durability**
+
+Durability ensures that once a transaction is committed, its changes are **permanent**, even in case of system failure.
+
+#### Steps:
+1. Debit $100 from A.
+2. Credit $100 to B.
+3. Commit the transaction.
+
+- What Happens If Durability Fails?
+  - The system crashes after committing the transaction.
+  - On recovery:
+    - Account A: $400
+    - Account B: $400
+    - Durability ensures these changes are saved to disk and remain intact.
+
+If durability is not ensured, data may revert to the previous state ($500 and $300), losing the transaction.
+
+---
+
+### Code Example: ACID in Action with TypeORM
+
+Here’s how ACID principles apply in a Node.js app using TypeORM:
+
+```typescript
+import { AppDataSource } from './data-source';
+
+async function transferFunds(senderId: number, receiverId: number, amount: number) {
+  const queryRunner = AppDataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
+  try {
+    // Atomicity: Both debit and credit must succeed
+    const sender = await queryRunner.manager.findOne('Account', { where: { id: senderId } });
+    const receiver = await queryRunner.manager.findOne('Account', { where: { id: receiverId } });
+
+    if (!sender || !receiver) throw new Error('Account not found');
+    if (sender.balance < amount) throw new Error('Insufficient funds');
+
+    // Debit sender
+    sender.balance -= amount;
+    await queryRunner.manager.save(sender);
+
+    // Credit receiver
+    receiver.balance += amount;
+    await queryRunner.manager.save(receiver);
+
+    // Commit transaction
+    await queryRunner.commitTransaction(); // Ensures Durability
+    console.log('Transaction successful');
+  } catch (error) {
+    // Rollback if any operation fails (Atomicity)
+    await queryRunner.rollbackTransaction();
+    console.error('Transaction failed:', error.message);
+  } finally {
+    await queryRunner.release(); // Ensures proper cleanup
+  }
+}
+
+transferFunds(1, 2, 100);
+```
+
+---
+
+### Explanation of Code:
+
+1. **Atomicity**: 
+   - Debit and credit are executed within a single transaction.
+   - If one fails, the entire transaction is rolled back.
+
+2. **Consistency**:
+   - Ensures the total balance across accounts remains unchanged.
+
+3. **Isolation**:
+   - The transaction runs in isolation using the query runner, avoiding interference with other transactions.
+
+4. **Durability**:
+   - Once the transaction commits, changes are persisted to the database, even if the application crashes afterward.
+
+---
+
+
+
 | **Feature**               | **SQL (ACID)**                                                                                          | **NoSQL (BASE)**                                                                                         |
 |---------------------------|--------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
 | **Atomicity**             | Ensures all steps in a transaction are completed; if not, none are executed.                           | Transactions may be incomplete; eventual consistency is prioritized.                                   |
