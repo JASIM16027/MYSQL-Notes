@@ -1142,3 +1142,93 @@ A `Products` table has a `Version` column.
 - **Optimistic Locking:** Detects conflicts later, offering better concurrency but requiring mechanisms to handle retries. Best suited for environments with low contention and high read activity.
 
 Choosing the right strategy depends on the application’s needs, contention levels, and trade-offs between performance and data consistency.
+
+
+## What is a two-phase commit? When would you use it?
+
+
+A **two-phase commit (2PC)** is a distributed transaction protocol used to ensure **atomicity** across multiple databases or systems. It ensures that either all participants in a transaction commit the changes or none of them do, maintaining consistency even in distributed environments.
+
+---
+
+### **How Two-Phase Commit Works**
+
+The two-phase commit protocol has two key phases: 
+
+#### **Phase 1: Prepare Phase**
+1. The **coordinator** (a central controlling entity) sends a **prepare message** to all participants (databases or nodes).
+2. Each participant:
+   - Executes the transaction locally, without committing the changes yet.
+   - Checks whether it can successfully commit the changes (e.g., no errors, constraints satisfied).
+   - Responds with either:
+     - **Vote COMMIT**: Ready to commit.
+     - **Vote ABORT**: Unable to commit (e.g., due to errors).
+
+#### **Phase 2: Commit/Abort Phase**
+1. The coordinator collects responses from all participants:
+   - If **all participants vote COMMIT**, the coordinator sends a **COMMIT message** to all participants, and they commit the transaction.
+   - If **any participant votes ABORT**, the coordinator sends an **ABORT message**, and all participants roll back their changes.
+2. Each participant acknowledges the decision (commit or abort).
+
+---
+
+### **When to Use Two-Phase Commit**
+The two-phase commit protocol is used in scenarios where a transaction spans multiple systems, and **consistency across systems is critical**. Typical use cases include:
+
+1. **Distributed Databases**:
+   - When a single transaction involves multiple databases (e.g., updating an order in one database and inventory in another).
+
+2. **Microservices Architectures**:
+   - When multiple microservices, each managing its own database, must coordinate a transaction (e.g., reserving a hotel room and booking a flight in a travel application).
+
+3. **Cross-Data Center Transactions**:
+   - When data updates span geographically distributed systems that need to remain consistent (e.g., global financial systems).
+
+4. **Eventual Consistency with Atomicity Guarantees**:
+   - When you need strong consistency between systems but still operate in a distributed environment.
+
+---
+
+### **Advantages of Two-Phase Commit**
+1. **Consistency**:
+   - Ensures all or none of the changes are applied across systems.
+   
+2. **Reliability**:
+   - Prevents partial updates, which could leave systems in an inconsistent state.
+
+3. **Compatibility**:
+   - Supported by most relational databases (e.g., MySQL, PostgreSQL, Oracle) and middleware systems (e.g., Kafka, RabbitMQ).
+
+---
+
+### **Disadvantages of Two-Phase Commit**
+1. **Blocking Nature**:
+   - Participants remain locked (waiting for a decision) during the commit process, reducing performance.
+
+2. **Single Point of Failure**:
+   - If the coordinator crashes, participants may be left in an uncertain state.
+
+3. **Latency**:
+   - Increased transaction latency due to the multiple communication steps.
+
+4. **Resource Intensive**:
+   - Requires participants to maintain logs and locks for the duration of the protocol.
+
+---
+
+### **Alternatives to Two-Phase Commit**
+If performance or availability is a concern, you might use other approaches:
+
+1. **Eventual Consistency** (e.g., Saga Pattern):
+   - Use compensating transactions to roll back changes in a distributed system if an error occurs.
+
+2. **Consensus Algorithms** (e.g., Paxos, Raft):
+   - Achieve agreement among distributed systems, often used for distributed databases like Cassandra or CockroachDB.
+
+3. **Distributed Transactions with 3PC**:
+   - A three-phase commit adds an extra phase to reduce blocking and uncertainty caused by coordinator failures.
+
+---
+
+### **Summary**
+The two-phase commit protocol is ideal for systems where **strong consistency** across distributed components is non-negotiable, such as financial systems or inventory management. However, due to its performance overhead and blocking nature, it's not always the best choice for highly available or low-latency systems, where alternative patterns like eventual consistency or the Saga pattern might be more suitable.
