@@ -1232,3 +1232,138 @@ If performance or availability is a concern, you might use other approaches:
 
 ### **Summary**
 The two-phase commit protocol is ideal for systems where **strong consistency** across distributed components is non-negotiable, such as financial systems or inventory management. However, due to its performance overhead and blocking nature, it's not always the best choice for highly available or low-latency systems, where alternative patterns like eventual consistency or the Saga pattern might be more suitable.
+
+
+Here’s an example of implementing a **two-phase commit** in a **NestJS application** using a relational database with TypeORM to demonstrate how you can handle distributed transactions.
+
+---
+
+### **Scenario**
+Imagine you are building a banking application where a transaction needs to debit an amount from one account and credit it to another. These operations might span two separate services or databases, and you want to ensure that both succeed or neither is applied.
+
+---
+
+### **Code Example**
+
+#### **1. Install Required Dependencies**
+Ensure you have **TypeORM** and a database driver installed (e.g., PostgreSQL).
+
+```bash
+npm install @nestjs/typeorm typeorm pg
+```
+
+---
+
+#### **2. Setup Database Entities**
+
+##### **Account Entity**
+Each account has an ID and a balance.
+
+```typescript
+// src/account.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+
+@Entity()
+export class Account {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  balance: number;
+}
+```
+
+---
+
+#### **3. Implement Two-Phase Commit Logic**
+
+##### **Service Layer**
+
+```typescript
+// src/transaction.service.ts
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { DataSource, QueryRunner } from 'typeorm';
+import { Account } from './account.entity';
+
+@Injectable()
+export class TransactionService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async transferFunds(senderId: number, receiverId: number, amount: number): Promise<void> {
+    // Create a query runner for managing the transaction
+    const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
+
+    // Connect the query runner to the database
+    await queryRunner.connect();
+
+    // Start a transaction (Phase 1: Prepare Phase)
+    await queryRunner.startTransaction();
+
+    try {
+      // Step 1: Debit sender's account
+      const sender = await queryRunner.manager.findOne(Account, { where: { id: senderId } });
+      if (!sender || sender.balance < amount) {
+        throw new Error('Insufficient funds or sender not found');
+      }
+      sender.balance -= amount;
+      await queryRunner.manager.save(sender);
+
+      // Step 2: Credit receiver's account
+      const receiver = await queryRunner.manager.findOne(Account, { where: { id: receiverId } });
+      if (!receiver) {
+        throw new Error('Receiver not found');
+      }
+      receiver.balance += amount;
+      await queryRunner.manager.save(receiver);
+
+      // If everything is successful, commit the transaction (Phase 2: Commit Phase)
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      // If any error occurs, rollback the transaction (Abort Phase)
+      await queryRunner.rollbackTransaction();
+      throw new InternalServerErrorException(error.message);
+    } finally {
+      // Release the query runner to free up resources
+      await queryRunner.release();
+    }
+  }
+}
+```
+
+---
+
+#### **4. Create a Controller**
+
+##### **Transaction Controller**
+Expose an endpoint for the transaction.
+
+```typescript
+      // src/transaction.controller.ts
+      import { Controller, Post, Body } from '@nestjs/common';
+      import { TransactionService } from './transaction.service';
+      
+      @Controller('transactions')
+      export class TransactionController {
+        constructor(private readonly transactionService: TransactionService) {}
+      
+        @Post('transfer')
+        async transferFunds(@Body() body: { senderId: number; receiverId: number; amount: number }) {
+          const { senderId, receiverId, amount } = body;
+      
+          try {
+            await this.transactionService.transferFunds(senderId, receiverId, amount);
+            return {
+              message: 'Transfer successful',
+              senderId,
+              receiverId,
+              amount,
+            };
+          } catch (error) {
+            return {
+              message: 'Transfer failed',
+              error: error.message,
+            };
+          }
+        }
+      }
+``` 
