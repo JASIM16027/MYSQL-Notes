@@ -1541,3 +1541,73 @@ To handle deadlocks effectively:
 ### **Conclusion**
 Deadlocks are an inherent challenge in concurrent database systems, but they can be managed effectively through a combination of prevention, detection, and resolution strategies. By understanding the underlying causes and implementing best practices, you can minimize the occurrence of deadlocks and ensure the smooth operation of your database system.
 
+
+## **Exponential Backoff: A Strategy for Handling Deadlocks and Retrying Transactions**  
+
+#### **What is Exponential Backoff?**  
+Exponential backoff is a strategy where, after a failure (such as a deadlock), the system **waits for an exponentially increasing amount of time** before retrying the operation. This reduces contention and improves overall system stability.
+
+Instead of retrying immediately, we **increase the delay exponentially** (e.g., 100ms, 200ms, 400ms, 800ms, etc.) to avoid overwhelming the system.
+
+---
+
+### **How Exponential Backoff Works in Deadlock Handling**
+1. A transaction tries to acquire a lock.
+2. If a deadlock occurs, the DBMS **rolls back the transaction**.
+3. Instead of retrying immediately, the transaction **waits for a random, exponentially increasing delay**.
+4. The transaction retries up to a maximum number of attempts.
+
+---
+
+### **Example: Exponential Backoff in Node.js (TypeORM + PostgreSQL/MySQL)**  
+This function **retries a transaction up to 5 times**, doubling the wait time after each failure:
+
+```typescript
+import { DataSource, EntityManager } from "typeorm";
+
+async function executeWithExponentialBackoff(
+  dataSource: DataSource,
+  operation: (transactionalEntityManager: EntityManager) => Promise<void>,
+  maxRetries: number = 5
+) {
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      await dataSource.transaction(async (transactionalEntityManager) => {
+        await operation(transactionalEntityManager);
+      });
+      return; // Success, exit the loop
+    } catch (error) {
+      if (error.message.includes("deadlock")) {
+        attempt++;
+        const delay = Math.pow(2, attempt) * 100 + Math.random() * 100; // Exponential backoff with jitter
+        console.warn(`Deadlock detected. Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        throw error; // If it's not a deadlock, rethrow the error
+      }
+    }
+  }
+
+  throw new Error("Max retries reached. Transaction failed.");
+}
+```
+
+---
+
+### **Breaking Down the Code**
+- The function **wraps the database operation** inside a transaction.
+- If a **deadlock occurs**, it:
+  - **Waits for an exponentially increasing delay** (`2^attempt * 100ms`).
+  - **Adds jitter** (`+ Math.random() * 100ms`) to prevent synchronized retries.
+  - **Retries the transaction**, up to `maxRetries` times.
+- If the maximum number of retries is reached, it **throws an error**.
+
+---
+
+### **Why Use Exponential Backoff?**
+✅ **Reduces database contention** (prevents simultaneous retries from causing new deadlocks).  
+✅ **Increases chances of success** (waits for locks to be released).  
+✅ **Prevents unnecessary failures** (retries intelligently instead of failing immediately).  
+
