@@ -1370,9 +1370,13 @@ Expose an endpoint for the transaction.
 
 ## How would you handle **deadlocks** in a database?
 
+### **Handling Deadlocks in a Database**
+
 Handling deadlocks in a database is a critical aspect of ensuring system reliability and performance. Deadlocks occur when two or more transactions are waiting indefinitely for one another to release locks on resources, creating a cycle of dependencies that cannot be resolved. Below is a detailed explanation of how to handle deadlocks:
 
 ---
+
+To effectively handle deadlocks, we can use **prevention**, **detection**, and **resolution** techniques.
 
 ### **1. Understanding Deadlocks**
 A deadlock arises when the following four conditions (known as the Coffman conditions) are met:
@@ -1386,28 +1390,50 @@ A deadlock arises when the following four conditions (known as the Coffman condi
 ### **2. Deadlock Prevention**
 Preventing deadlocks involves ensuring that at least one of the Coffman conditions cannot occur. Common strategies include:
 
-#### **a. Lock Ordering**
-- Define a global order for acquiring locks and ensure all transactions follow this order.
+### **a. Lock Ordering (Consistent Order of Resource Acquisition)**
+- Ensure that transactions acquire locks in a consistent order.
 - Example: If Transaction A needs to lock Table X and then Table Y, Transaction B must also lock Table X before Table Y.
 - This prevents circular waits.
 
-#### **b. Lock Timeout**
+### **b. Timeout-Based Abort (Setting Lock Timeout)**
+- Set a **lock timeout** so that a transaction will not wait indefinitely.
 - Set a maximum time a transaction can wait for a lock. If the timeout is reached, the transaction is rolled back.
 - This breaks the "hold and wait" condition.
+- Example (PostgreSQL):
+  
+  ```sql
+  
+  SET lock_timeout = '5s';
+
+  ```
+
+- If a transaction cannot acquire a lock within 5 seconds, it aborts and retries.
+
 
 #### **c. Preemption**
 - Allow the database to forcibly revoke locks from one transaction to resolve a deadlock.
 - This violates the "no preemption" condition.
 
 #### **d. Wait-Die or Wound-Wait Schemes**
+
 - **Wait-Die**: If a transaction requests a lock held by an older transaction, it waits. If the requesting transaction is older, it is aborted.
 - **Wound-Wait**: If a transaction requests a lock held by a younger transaction, the younger transaction is aborted. If the requesting transaction is younger, it waits.
 - These schemes prevent circular waits by prioritizing older transactions.
 
 ---
 
-### **3. Deadlock Detection**
-If prevention is not feasible, the database can detect deadlocks and resolve them. Detection involves:
+### **Avoid Long Transactions**
+- Shorter transactions reduce the chance of deadlocks.
+- Use **batch processing** instead of large, long-running transactions.
+
+### ** Using Lower Isolation Levels (When Possible)**
+- Higher isolation levels (e.g., **Serializable**) increase the chance of deadlocks.
+- Instead, use **Read Committed** or **Repeatable Read** when possible.
+
+---
+
+## **2. Deadlock Detection**
+If prevention is not feasible, databases must detect and resolve deadlocks.
 
 #### **a. Wait-for Graph**
 - A directed graph where nodes represent transactions, and edges represent dependencies (e.g., Transaction A is waiting for a lock held by Transaction B).
@@ -1418,20 +1444,67 @@ If prevention is not feasible, the database can detect deadlocks and resolve the
 
 ---
 
-### **4. Deadlock Resolution**
-Once a deadlock is detected, the database must resolve it by breaking the cycle. Common resolution strategies include:
+### **a. Deadlock Detection in Database Management Systems (DBMS)**
+Most databases have built-in deadlock detection mechanisms:
+- **PostgreSQL:** Uses a background process to detect circular waits.
+- **MySQL (InnoDB):** Detects deadlocks when transactions wait for locks.
+- **SQL Server:** Runs a deadlock monitor periodically.
 
-#### **a. Victim Selection**
-- Choose one transaction as the "victim" to roll back. The selection can be based on:
-  - **Transaction Age**: Roll back the youngest transaction.
-  - **Resource Usage**: Roll back the transaction holding the fewest resources.
-  - **Priority**: Roll back the transaction with the lowest priority.
-
-#### **b. Rollback and Retry**
-- The victim transaction is rolled back, releasing its locks, and is retried later.
-- The retry logic should include a delay to reduce the likelihood of another deadlock.
+### **b. Example: Checking for Deadlocks in MySQL**
+You can use the following command to check deadlocks:
+```sql
+SHOW ENGINE INNODB STATUS;
+```
+This will output the latest deadlock details.
 
 ---
+
+## **3. Deadlock Resolution**
+Once a deadlock is detected, the DBMS automatically resolves it using **one of the following strategies**:
+
+### **a. Transaction Rollback (Victim Selection)**
+- The DBMS **selects one transaction** (usually the one with the least impact) and rolls it back.
+- The aborted transaction can then retry.
+
+### **b. Retrying the Transaction with Exponential Backoff**
+- If a deadlock occurs, the application can **retry the transaction after a short delay**.
+- Example in **Node.js with TypeORM**:
+  ```typescript
+  async function executeTransaction(entityManager) {
+    const MAX_RETRIES = 3;
+    let attempt = 0;
+
+    while (attempt < MAX_RETRIES) {
+      try {
+        return await entityManager.transaction(async (transactionalEntityManager) => {
+          // Perform operations
+        });
+      } catch (error) {
+        if (error.message.includes('Deadlock')) {
+          attempt++;
+          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 100)); // Exponential backoff
+        } else {
+          throw error;
+        }
+      }
+    }
+  }
+  ```
+- The **exponential backoff** reduces contention by delaying the retry.
+
+### **c. Using Optimistic Concurrency Control (OCC)**
+Instead of locking rows, use **version numbers** or timestamps:
+- A transaction updates only if the record has not been modified by another transaction.
+- Example (PostgreSQL):
+  ```sql
+  UPDATE employees 
+  SET salary = salary + 1000 
+  WHERE id = 1 AND last_updated = '2025-01-30T10:00:00';
+  ```
+- If `last_updated` has changed, the transaction is aborted and retried.
+
+---
+
 
 ### **5. Best Practices to Minimize Deadlocks**
 - **Keep Transactions Short**: Minimize the time locks are held by reducing transaction duration.
@@ -1457,6 +1530,13 @@ Different databases provide built-in mechanisms for handling deadlocks:
 - **Logging**: Log deadlock occurrences for analysis and optimization.
 
 ---
+
+## **Conclusion**
+To handle deadlocks effectively:
+1. **Prevent them** using consistent locking order, timeouts, and shorter transactions.
+2. **Detect them** using DBMS logs (`SHOW ENGINE INNODB STATUS`).
+3. **Resolve them** by rolling back and retrying transactions with exponential backoff.
+
 
 ### **Conclusion**
 Deadlocks are an inherent challenge in concurrent database systems, but they can be managed effectively through a combination of prevention, detection, and resolution strategies. By understanding the underlying causes and implementing best practices, you can minimize the occurrence of deadlocks and ensure the smooth operation of your database system.
