@@ -1611,3 +1611,219 @@ async function executeWithExponentialBackoff(
 ✅ **Increases chances of success** (waits for locks to be released).  
 ✅ **Prevents unnecessary failures** (retries intelligently instead of failing immediately).  
 
+
+
+#### **Q1: What is a transaction in a database?**  
+A **transaction** is a sequence of one or more database operations that are treated as a single unit of work. It follows the **ACID** properties (Atomicity, Consistency, Isolation, Durability).  
+
+#### **Q2: Explain the ACID properties in a transaction.**  
+- **Atomicity:** Ensures all operations in a transaction complete successfully or none at all.  
+- **Consistency:** Ensures the database remains in a valid state before and after the transaction.  
+- **Isolation:** Ensures transactions do not interfere with each other.  
+- **Durability:** Ensures committed changes are permanently stored even after system failures.  
+
+#### **Q3: What is the difference between COMMIT and ROLLBACK?**  
+- **COMMIT**: Saves all changes made in the transaction permanently.  
+- **ROLLBACK**: Reverts all changes made in the current transaction to the last committed state.  
+
+---
+
+### **Concurrency Control**  
+
+#### **Q4: What is concurrency control in databases?**  
+Concurrency control ensures multiple transactions execute **safely** and **correctly** when accessing shared data **simultaneously**. It prevents issues like dirty reads, lost updates, and deadlocks.
+
+#### **Q5: What are isolation levels in SQL, and why are they important?**  
+Isolation levels control how much one transaction **can see changes** made by other transactions.  
+
+#### **What is Isolation in SQL?**  
+Isolation is one of the four **ACID** properties (Atomicity, Consistency, Isolation, Durability) that ensure the integrity and consistency of a database during concurrent transactions. **Isolation** determines how visible the changes of one transaction are to other transactions before it is committed.
+
+When multiple transactions run concurrently, they can lead to issues like **dirty reads, non-repeatable reads, and phantom reads**. **Isolation levels** define the degree to which one transaction is isolated from another to prevent these anomalies.
+
+---
+
+## **Types of Isolation Levels in SQL**  
+SQL databases provide different **isolation levels** to control how transactions interact with each other. The standard **SQL isolation levels** are:
+
+1. **Read Uncommitted**
+2. **Read Committed**
+3. **Repeatable Read**
+4. **Serializable**
+
+Each level provides a different balance between **concurrency** and **data consistency**.
+
+---
+
+## **1. Read Uncommitted (Lowest Isolation Level)**
+### **Definition:**  
+- A transaction can **read data** that another transaction has modified but not yet committed.
+- This means you can **read uncommitted (dirty) data**.
+
+### **Possible Issues (Anomalies):**
+❌ **Dirty Read** – A transaction reads changes made by another transaction before it is committed. If the second transaction rolls back, the first transaction is left with incorrect data.
+
+### **Example Scenario:**
+1. **Transaction A** updates a product price but hasn’t committed the change.
+   ```sql
+   UPDATE Products SET Price = 500 WHERE ProductID = 1;
+   ```
+2. **Transaction B** reads the product price **before Transaction A commits or rolls back**.
+   ```sql
+   SELECT Price FROM Products WHERE ProductID = 1;
+   ```
+3. **If Transaction A rolls back**, Transaction B has already read incorrect data.
+
+### **Use Cases:**  
+✅ High-performance scenarios where data consistency is not critical, such as **log systems** or **temporary reporting dashboards**.
+
+---
+
+## **2. Read Committed (Default in Many Databases)**
+### **Definition:**  
+- A transaction can only read **committed** data.
+- Uncommitted changes are **invisible** to other transactions.
+
+### **Prevents:**
+✅ **Dirty Reads** (Because it only reads committed data)
+
+### **Possible Issues (Anomalies):**
+❌ **Non-Repeatable Read** – A transaction reads the same row twice, but the data has changed in between because another transaction committed an update.
+
+### **Example Scenario:**
+1. **Transaction A** reads an employee’s salary.
+   ```sql
+   SELECT Salary FROM Employees WHERE EmployeeID = 101;
+   ```
+2. **Transaction B** updates the salary and commits it.
+   ```sql
+   UPDATE Employees SET Salary = 8000 WHERE EmployeeID = 101;
+   COMMIT;
+   ```
+3. **Transaction A** reads the salary again and sees a different value.
+
+### **Use Cases:**  
+✅ Suitable for **most transactional applications**, such as banking and e-commerce, where **data consistency is required** but strict isolation is not needed.
+
+---
+
+## **3. Repeatable Read**
+### **Definition:**  
+- Ensures that if a transaction reads the same row multiple times, **the data remains the same** throughout the transaction.  
+- **Prevents dirty reads and non-repeatable reads**.
+
+### **Prevents:**  
+✅ **Dirty Reads**  
+✅ **Non-Repeatable Reads**
+
+### **Possible Issues (Anomalies):**  
+❌ **Phantom Reads** – If a transaction queries a range of rows, another transaction may insert a new row into that range, causing different results in subsequent queries.
+
+### **Example Scenario:**
+1. **Transaction A** reads all employees with a salary above 5000.
+   ```sql
+   SELECT * FROM Employees WHERE Salary > 5000;
+   ```
+2. **Transaction B** inserts a new employee with Salary = 6000 and commits.
+   ```sql
+   INSERT INTO Employees (EmployeeID, Name, Salary) VALUES (102, 'John', 6000);
+   COMMIT;
+   ```
+3. **Transaction A** re-executes the same query and now sees a new employee (phantom read).
+
+### **Use Cases:**  
+✅ Used in **financial applications** where consistency of read operations is critical.  
+✅ Suitable for scenarios where frequent updates happen on the same rows.
+
+---
+
+## **4. Serializable (Highest Isolation Level)**
+### **Definition:**  
+- **Strictest** isolation level that prevents **all anomalies** (dirty reads, non-repeatable reads, and phantom reads).  
+- Transactions are executed **sequentially** (one after another), avoiding conflicts.  
+
+### **Prevents:**  
+✅ **Dirty Reads**  
+✅ **Non-Repeatable Reads**  
+✅ **Phantom Reads**  
+
+### **Example Scenario:**
+1. **Transaction A** starts and reads all orders from `Orders` table.
+   ```sql
+   SELECT * FROM Orders;
+   ```
+2. **Transaction B** attempts to insert a new order but is **blocked** until Transaction A is completed.
+   ```sql
+   INSERT INTO Orders (OrderID, Amount) VALUES (105, 1000);
+   -- This operation will wait until Transaction A finishes.
+   ```
+
+### **Use Cases:**  
+✅ **Critical applications like banking, financial transactions, and ledgers** where absolute consistency is required.  
+✅ Suitable for **batch processing** but can **reduce performance** due to strict locking.
+
+---
+
+## **Comparison of SQL Isolation Levels**
+| **Isolation Level**       | **Dirty Read** | **Non-Repeatable Read** | **Phantom Read** | **Performance Impact** |
+|--------------------------|---------------|-------------------------|------------------|------------------------|
+| Read Uncommitted        | ✅ Yes        | ✅ Yes                  | ✅ Yes           | 🚀 Fastest (Least restrictive) |
+| Read Committed          | ❌ No         | ✅ Yes                  | ✅ Yes           | ⚡ Fast, but some anomalies |
+| Repeatable Read         | ❌ No         | ❌ No                   | ✅ Yes           | ⏳ Moderate |
+| Serializable            | ❌ No         | ❌ No                   | ❌ No            | 🐢 Slowest (Most restrictive) |
+
+---
+
+## **Why Are Isolation Levels Important?**
+1. **Ensuring Data Consistency** – Prevents anomalies when multiple users access the database.  
+2. **Balancing Performance and Integrity** – Choosing the right isolation level avoids unnecessary blocking while maintaining consistency.  
+3. **Avoiding Deadlocks and Lock Contention** – Higher isolation levels increase locking, which can lead to performance degradation.  
+4. **Maintaining Business Logic Correctness** – Ensures critical transactions (e.g., money transfers) execute correctly.
+
+---
+
+## **How to Set Isolation Levels in SQL?**
+Most databases allow you to set isolation levels using SQL commands.
+
+### **Example in MySQL / PostgreSQL / SQL Server**
+```sql
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+BEGIN TRANSACTION;
+
+-- Your queries here
+
+COMMIT;
+```
+
+### **How to Set Isolation Level for a Specific Query**
+```sql
+START TRANSACTION;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+SELECT * FROM Orders WHERE OrderID = 101;
+
+COMMIT;
+```
+
+---
+
+## **Conclusion**
+Isolation levels help **balance concurrency and consistency** in a database. **Choosing the right isolation level** depends on the specific use case:
+- **Read Uncommitted**: High-speed, but risk of incorrect data.
+- **Read Committed**: Default for most systems, prevents dirty reads.
+- **Repeatable Read**: Ensures stability for repeated queries, but still allows phantom reads.
+- **Serializable**: Guarantees **full consistency**, but may reduce system performance.
+
+
+#### **Q6: What are dirty reads, non-repeatable reads, and phantom reads?**  
+- **Dirty Read:** Transaction reads uncommitted data from another transaction.  
+- **Non-Repeatable Read:** Data changes between two reads of the same row within a transaction.  
+- **Phantom Read:** A transaction sees new rows added by another transaction.  
+
+#### **Q7: How does optimistic locking differ from pessimistic locking?**  
+- **Pessimistic Locking:** Locks data to prevent other transactions from modifying it (suitable for high-contention environments).  
+- **Optimistic Locking:** Allows multiple transactions and only checks conflicts at commit time (better for read-heavy systems).  
+
+---
+
+
